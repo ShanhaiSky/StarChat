@@ -1,0 +1,415 @@
+/**
+ * @author ShanhaiSky
+ * 感谢 WPS 灵犀团队的设计灵感
+ */
+/* ═══════════════════════════════════════════════════════
+   StarChat — 全局样式
+   参照 WPS 灵犀 AI 助手设计风格
+   ═══════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 字体 ── */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue',
+               'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+
+  /* ── 侧边栏 ── */
+  --sidebar-bg: #F0F0F0;
+  --sidebar-width: 220px;
+  --sidebar-collapsed-width: 64px;
+
+  /* ── 主内容区 ── */
+  --bg-page: #f7f7f5;
+  --bg-card: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b6b6b;
+  --text-muted: #9b9b9b;
+  --border: #e5e4e1;
+  --border-light: #f0efec;
+
+  /* ── 功能标签色 ── */
+  --color-gold: #E3AA4E;
+  --color-blue: #3049C6;
+  --color-pink: #E76377;
+
+  /* ── 渐变 ── */
+  --gradient-accent: linear-gradient(90deg, #E3AA4E 0%, #E76377 52.4%, #3049C6 100%);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 通用卡片 ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border-color: var(--color-blue);
+}
+
+/* ── 滚动条 ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* ── 代码块 ── */
+.code-block {
+  position: relative;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f8f9fa;
+  border: 1px solid #e8e8e8;
+}
+
+.code-body {
+  overflow-x: auto;
+
+  pre {
+    margin: 0;
+    padding: 14px 16px;
+    background: transparent;
+    border-radius: 0;
+  }
+
+  code {
+    background: none;
+    padding: 0;
+    font-size: 13px;
+    line-height: 1.6;
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+  }
+}
+
+.code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  background: #f0f0f0;
+  border-top: 1px solid #e8e8e8;
+}
+
+.code-toolbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.code-lang {
+  font-size: 11px;
+  color: #999;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.code-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.code-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #999;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.06);
+    color: #333;
+  }
+
+  &.copied {
+    color: #16a34a;
+  }
+}
+
+.code-btn-html {
+  color: #2563eb;
+
+  &:hover {
+    background: rgba(37, 99, 235, 0.08);
+    color: #1d4ed8;
+  }
+}
+
+/* ── Mermaid 图表 ── */
+.mermaid-block {
+  margin-bottom: 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.mermaid-body {
+  max-height: 400px;
+  overflow: auto;
+  padding: 16px;
+  text-align: center;
+
+  svg {
+    max-width: 100%;
+    height: auto;
+    display: inline-block;
+  }
+}
+
+.mermaid-code {
+  pre {
+    margin: 0;
+    padding: 14px 16px;
+    background: #f8f9fa;
+    overflow-x: auto;
+  }
+
+  code {
+    background: none;
+    padding: 0;
+    font-size: 13px;
+    color: #383a42;
+  }
+}
+
+.mermaid-loading {
+  padding: 24px;
+  color: #999;
+  font-size: 13px;
+}
+
+.mermaid-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  background: #f0f0f0;
+  border-top: 1px solid #e8e8e8;
+
+  .code-lang { font-size: 11px; color: #999; font-weight: 500; text-transform: uppercase; }
+  .mermaid-toolbar-right { display: flex; align-items: center; gap: 4px; }
+}
+
+.mermaid-error-wrap {
+  .mermaid-body {
+    text-align: left;
+    background: #fef2f2;
+    max-height: none;
+  }
+}
+
+.mermaid-error {
+  .mermaid-error-label {
+    display: block;
+    font-size: 12px;
+    color: #dc2626;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  pre {
+    margin: 0;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 6px;
+    font-size: 12px;
+    color: #666;
+    overflow-x: auto;
+  }
+}
+
+/* ── Mermaid 大图弹窗 ── */
+.mermaid-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+
+  &.open { opacity: 1; }
+}
+
+.mermaid-modal-mask {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.mermaid-modal-content {
+  position: relative;
+  width: 90vw;
+  height: 85vh;
+  background: #fff;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.mermaid-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e8e8e8;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  flex-shrink: 0;
+}
+
+.mermaid-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.modal-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #f0f0f0;
+    color: #333;
+  }
+}
+
+.modal-btn-close:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.mermaid-modal-body {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  cursor: grab;
+
+  &:active { cursor: grabbing; }
+}
+
+.mermaid-modal-svg {
+  transition: transform 0.15s ease;
+  transform-origin: center center;
+
+  svg {
+    max-width: none;
+  }
+}
+
+/* ── highlight.js 浅色主题 ── */
+.hljs { color: #383a42; }
+.hljs-keyword { color: #a626a4; font-weight: 500; }
+.hljs-built_in { color: #c18401; }
+.hljs-type { color: #c18401; }
+.hljs-literal { color: #0184bc; }
+.hljs-number { color: #986801; }
+.hljs-string { color: #50a14f; }
+.hljs-regexp { color: #e45649; }
+.hljs-symbol { color: #4078f2; }
+.hljs-variable { color: #e45649; }
+.hljs-template-variable { color: #e45649; }
+.hljs-title { color: #4078f2; }
+.hljs-title.class_ { color: #c18401; }
+.hljs-title.function_ { color: #4078f2; }
+.hljs-params { color: #383a42; }
+.hljs-comment { color: #a0a1a7; font-style: italic; }
+.hljs-doctag { color: #a626a4; }
+.hljs-meta { color: #a0a1a7; }
+.hljs-meta .hljs-keyword { color: #a626a4; }
+.hljs-meta .hljs-string { color: #50a14f; }
+.hljs-section { color: #4078f2; }
+.hljs-selector-tag { color: #a626a4; }
+.hljs-selector-id { color: #4078f2; }
+.hljs-selector-class { color: #c18401; }
+.hljs-selector-attr { color: #4078f2; }
+.hljs-selector-pseudo { color: #50a14f; }
+.hljs-attr { color: #4078f2; }
+.hljs-attribute { color: #50a14f; }
+.hljs-name { color: #e45649; }
+.hljs-tag { color: #e45649; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }
+.hljs-link { color: #0184bc; text-decoration: underline; }
+.hljs-addition { color: #50a14f; background: rgba(80, 161, 79, 0.08); }
+.hljs-deletion { color: #e45649; background: rgba(228, 86, 73, 0.08); }
+
+/* ── 页面切换动画 ── */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.page-slide-enter-active,
+.page-slide-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.page-slide-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.page-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+/* ── 按钮点击效果 ── */
+.btn-press:active {
+  transform: scale(0.97);
+  transition: transform 0.1s;
+}
