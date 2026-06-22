@@ -80,7 +80,7 @@ MIT
 
 ## 🙏 致谢
 
-- UI 设计参照 [WPS 灵犀 AI 助手](https://linxi.wps.cn/)，感谢 WPS 灵犀团队
+- UI 设计参照 [WPS 灵犀 AI 助手](https://lingxi.wps.cn/)，感谢 WPS 灵犀团队
 - 图标库 [Hugeicons](https://hugeicons.com/)
 - 语法高亮 [highlight.js](https://highlightjs.org/)
 - 图表渲染 [Mermaid](https://mermaid.js.org/)
