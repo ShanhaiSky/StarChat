@@ -156,6 +156,54 @@ export async function renderMermaidBlocks() {
 }
 
 /**
+ * 在新窗口中渲染 HTML
+ * 兼容浏览器、Electron 和 Tauri 环境
+ */
+async function renderHtmlInNewWindow(htmlCode) {
+  // 使用 data URL 方式，兼容性最好
+  const dataUrl = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlCode)
+
+  // 尝试打开新窗口
+  const win = window.open(dataUrl, '_blank')
+
+  if (!win) {
+    // 如果 window.open 被阻止，使用 iframe 渲染
+    showHtmlModal(htmlCode)
+  }
+}
+
+/**
+ * 显示 HTML 渲染弹窗
+ */
+function showHtmlModal(htmlCode) {
+  // 移除已有弹窗
+  document.querySelector('.html-render-modal')?.remove()
+
+  const modal = document.createElement('div')
+  modal.className = 'html-render-modal'
+  modal.innerHTML = `
+    <div class="html-modal-mask"></div>
+    <div class="html-modal-content">
+      <div class="html-modal-header">
+        <span>HTML 预览</span>
+        <button class="html-modal-close" title="关闭">
+          <svg viewBox="0 0 16 16" fill="none" width="16" height="16"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div class="html-modal-body">
+        <iframe sandbox="allow-scripts" srcdoc="${htmlCode.replace(/"/g, '&quot;')}"></iframe>
+      </div>
+    </div>
+  `
+
+  document.body.appendChild(modal)
+
+  // 关闭事件
+  modal.querySelector('.html-modal-close').addEventListener('click', () => modal.remove())
+  modal.querySelector('.html-modal-mask').addEventListener('click', () => modal.remove())
+}
+
+/**
  * 初始化代码块事件委托
  */
 export function initCodeBlockHandlers() {
@@ -206,9 +254,7 @@ export function initCodeBlockHandlers() {
     }
 
     if (action === 'open-html') {
-      const win = window.open('', '_blank')
-      win.document.write(code)
-      win.document.close()
+      renderHtmlInNewWindow(code)
     }
   })
 }

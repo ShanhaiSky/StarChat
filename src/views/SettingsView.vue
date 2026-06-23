@@ -44,6 +44,43 @@
                   <label class="field-label">API Key</label>
                   <el-input v-model="m.apiKey" type="password" show-password placeholder="可选" size="small" />
                 </div>
+                <div class="field-row">
+                  <label class="field-label">认证方式</label>
+                  <el-select v-model="m.authType" size="small" style="flex:1">
+                    <el-option value="bearer">
+                      <span class="auth-option">Bearer Token</span>
+                      <span class="auth-desc">OpenAI / DeepSeek 等标准 API</span>
+                    </el-option>
+                    <el-option value="x-apikey">
+                      <span class="auth-option">X-APIKey</span>
+                      <span class="auth-desc">企业内网网关认证</span>
+                    </el-option>
+                    <el-option value="x-api-key">
+                      <span class="auth-option">X-Api-Key</span>
+                      <span class="auth-desc">AWS API Gateway 默认格式</span>
+                    </el-option>
+                    <el-option value="basic">
+                      <span class="auth-option">Basic Auth</span>
+                      <span class="auth-desc">传统 HTTP 基础认证</span>
+                    </el-option>
+                    <el-option value="custom">
+                      <span class="auth-option">自定义 Header</span>
+                      <span class="auth-desc">任意自定义请求头</span>
+                    </el-option>
+                  </el-select>
+                </div>
+                <div v-if="m.authType === 'custom'" class="field-row">
+                  <label class="field-label">Header 名称</label>
+                  <el-input v-model="m.authHeaderName" placeholder="例如: X-Token" size="small" />
+                </div>
+                <div v-if="m.authType === 'x-apikey'" class="field-row">
+                  <label class="field-label">思考模式</label>
+                  <el-select v-model="m.thinkingMode" size="small" style="flex:1">
+                    <el-option label="关闭" value="off" />
+                    <el-option label="High（标准思考）" value="high" />
+                    <el-option label="Max（深度思考）" value="max" />
+                  </el-select>
+                </div>
               </div>
             </div>
           </div>
@@ -176,7 +213,7 @@ const usageStore = useUsageStore()
 const tab = ref('config')
 
 const form = ref({
-  models: [{ name: 'deepseek-v4-flash', baseUrl: 'https://api.deepseek.com/v1', apiKey: '' }],
+  models: [{ name: 'deepseek-v4-flash', baseUrl: 'https://api.deepseek.com/v1', apiKey: '', authType: 'bearer', authHeaderName: '', thinkingMode: 'off' }],
   currentModel: 'deepseek-v4-flash',
   supportsReasoning: false,
 })
@@ -194,7 +231,7 @@ onMounted(() => {
 })
 
 function addModel() {
-  form.value.models.push({ name: '', baseUrl: 'https://api.deepseek.com/v1', apiKey: '' })
+  form.value.models.push({ name: '', baseUrl: 'https://api.deepseek.com/v1', apiKey: '', authType: 'bearer', authHeaderName: '', thinkingMode: 'off' })
 }
 
 function removeModel(idx) {
@@ -376,6 +413,18 @@ async function handleClearUsage() {
 .model-fields { display: flex; flex-direction: column; gap: 8px; }
 .field-row { display: flex; align-items: center; gap: 10px; }
 .field-label { font-size: 12px; color: var(--text-secondary); width: 64px; flex-shrink: 0; text-align: right; }
+
+/* ── 认证方式选项样式 ── */
+.auth-option {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.auth-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 8px;
+}
 
 .add-model-btn {
   display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-blue); padding: 6px 0;

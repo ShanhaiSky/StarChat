@@ -1,6 +1,6 @@
 <!-- @author ShanhaiSky -->
 <template>
-  <div class="main-layout">
+  <div class="main-layout" :class="{ 'app-ready': appReady }">
     <!-- 侧边栏 -->
     <aside class="sidebar" :class="{ collapsed: isCollapsed }">
       <!-- Logo -->
@@ -82,7 +82,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
@@ -96,6 +96,7 @@ const router = useRouter()
 const chatStore = useChatStore()
 const isCollapsed = ref(false)
 const chatExpanded = ref(true)
+const appReady = inject('appReady', ref(false))
 
 const isChatActive = computed(() => {
   return route.path === '/' || route.path === '/chat' || route.path.startsWith('/chat/')
@@ -158,9 +159,23 @@ async function deleteSession(id) {
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   flex-shrink: 0;
+  opacity: 0;
+  transform: translateX(-100%);
 
   &.collapsed {
     width: var(--sidebar-collapsed-width);
+  }
+}
+
+/* ── 入场动画 ── */
+.app-ready .sidebar {
+  animation: slide-in-left 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes slide-in-left {
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 

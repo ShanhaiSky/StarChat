@@ -8,7 +8,7 @@ const CONFIG_KEY = 'audichat_llm_config'
 
 const DEFAULT_CONFIG = {
   models: [
-    { name: 'deepseek-v4-flash', baseUrl: 'https://api.deepseek.com/v1', apiKey: '' },
+    { name: 'deepseek-v4-flash', baseUrl: 'https://api.deepseek.com/v1', apiKey: '', authType: 'bearer', authHeaderName: '', thinkingMode: 'off' },
   ],
   currentModel: 'deepseek-v4-flash',
   supportsReasoning: false,
@@ -25,7 +25,7 @@ export function getLLMConfig() {
 
       // 兼容旧格式1：顶层 baseUrl/apiKey/model
       if (config.baseUrl && !config.models?.length) {
-        config.models = [{ name: config.model || 'default', baseUrl: config.baseUrl, apiKey: config.apiKey || '' }]
+        config.models = [{ name: config.model || 'default', baseUrl: config.baseUrl, apiKey: config.apiKey || '', authType: 'bearer', authHeaderName: '', thinkingMode: 'off' }]
         config.currentModel = config.models[0].name
         delete config.baseUrl
         delete config.apiKey
@@ -38,6 +38,9 @@ export function getLLMConfig() {
           name,
           baseUrl: config.baseUrl || 'https://api.deepseek.com/v1',
           apiKey: config.apiKey || '',
+          authType: 'bearer',
+          authHeaderName: '',
+          thinkingMode: 'off',
         }))
         delete config.baseUrl
         delete config.apiKey
@@ -76,7 +79,39 @@ export function setLLMConfig(config) {
  */
 function getCurrentModelConfig(config) {
   const model = config.models?.find(m => m.name === config.currentModel)
-  return model || config.models?.[0] || { name: '', baseUrl: '', apiKey: '' }
+  return model || config.models?.[0] || { name: '', baseUrl: '', apiKey: '', authType: 'bearer', authHeaderName: '', thinkingMode: 'off' }
+}
+
+/**
+ * 构建认证 headers
+ * @param {Object} model - 模型配置
+ * @returns {Object} headers 对象
+ */
+function buildAuthHeaders(model) {
+  const headers = { 'Content-Type': 'application/json' }
+  if (!model.apiKey) return headers
+
+  const authType = model.authType || 'bearer'
+
+  switch (authType) {
+    case 'x-apikey':
+      headers['X-APIKey'] = model.apiKey
+      break
+    case 'x-api-key':
+      headers['X-Api-Key'] = model.apiKey
+      break
+    case 'basic':
+      headers['Authorization'] = `Basic ${btoa(model.apiKey)}`
+      break
+    case 'custom':
+      if (model.authHeaderName) {
+        headers[model.authHeaderName] = model.apiKey
+      }
+      break
+    default: // bearer
+      headers['Authorization'] = `Bearer ${model.apiKey}`
+  }
+  return headers
 }
 
 /**
@@ -97,12 +132,15 @@ export async function* chatStream(messages, config, signal) {
     stream_options: { include_usage: true },
   }
 
-  const headers = {
-    'Content-Type': 'application/json',
+  // 添加思考模式参数（适用于 x-apikey 模式的 API）
+  if (model.thinkingMode && model.thinkingMode !== 'off') {
+    body.chat_template_kwargs = {
+      thinking: true,
+      reasoning_effort: model.thinkingMode, // 'high' 或 'max'
+    }
   }
-  if (model.apiKey) {
-    headers['Authorization'] = `Bearer ${model.apiKey}`
-  }
+
+  const headers = buildAuthHeaders(model)
 
   const response = await fetch(`${model.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -179,11 +217,10 @@ export async function* chatStream(messages, config, signal) {
  */
 export async function generateTitle(firstMessage, config) {
   const model = getCurrentModelConfig(config)
+  const headers = buildAuthHeaders(model)
 
-  const headers = { 'Content-Type': 'application/json' }
-  if (model.apiKey) {
-    headers['Authorization'] = `Bearer ${model.apiKey}`
-  }
+  // 截取前 100 字符作为输入
+  const truncatedMessage = firstMessage.slice(0, 100)
 
   const response = await fetch(`${model.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -193,19 +230,55 @@ export async function generateTitle(firstMessage, config) {
       messages: [
         {
           role: 'system',
-          content: '你是一个标题生成助手。请根据用户的对话内容，生成一个简短的标题（不超过20个字）。只输出标题，不要任何其他内容。',
+          content: '你是标题生成器。用户发什么消息，你就输出一个15字以内的中文标题。直接输出标题，不要有任何前缀、解释或思考。',
         },
-        { role: 'user', content: firstMessage },
+        { role: 'user', content: truncatedMessage },
       ],
       stream: false,
-      max_tokens: 50,
+      max_tokens: 2000,
+      temperature: 0.1,
+      enable_thinking: false,
     }),
   })
 
   if (!response.ok) throw new Error('生成标题失败')
 
   const data = await response.json()
-  return data.choices?.[0]?.message?.content?.trim() || ''
+  let content = data.choices?.[0]?.message?.content?.trim()
+
+  // 如果 content 为空，从 reasoning_content 提取
+  if (!content) {
+    const reasoning = data.choices?.[0]?.message?.reasoning_content
+    if (reasoning) {
+      const match = reasoning.match(/标题[是为：:]+["'"「]?([^"'"」\n]{2,20})["'"」]?/)
+      if (match) {
+        content = match[1]
+      } else {
+        const sentences = reasoning.split(/[。！？\n]/).filter(s => s.trim().length >= 2 && s.trim().length <= 20)
+        if (sentences.length > 0) {
+          content = sentences[sentences.length - 1].trim()
+        }
+      }
+    }
+  }
+
+  if (!content) return '新对话'
+
+  // 清理标题
+  content = content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/^["'"「]+/, '')
+    .replace(/["'"」]+$/, '')
+    .replace(/^(标题[是为：:]+|所以|那么|因此|综上)/, '')
+    .trim()
+
+  // 限制长度
+  if (content.length > 15) {
+    content = content.slice(0, 15)
+  }
+
+  return content || '新对话'
 }
 
 /**
@@ -213,11 +286,7 @@ export async function generateTitle(firstMessage, config) {
  */
 export async function generateSlogan(prompt, config) {
   const model = getCurrentModelConfig(config)
-
-  const headers = { 'Content-Type': 'application/json' }
-  if (model.apiKey) {
-    headers['Authorization'] = `Bearer ${model.apiKey}`
-  }
+  const headers = buildAuthHeaders(model)
 
   const response = await fetch(`${model.baseUrl}/chat/completions`, {
     method: 'POST',
@@ -225,18 +294,28 @@ export async function generateSlogan(prompt, config) {
     body: JSON.stringify({
       model: model.name,
       messages: [
-        { role: 'system', content: '你是一个 slogan 生成助手。只输出 slogan 本身，不要引号，不要任何其他内容。' },
+        { role: 'system', content: '你是一个 slogan 生成助手。原始 slogan：以星辰为引，洞见万千。只输出 slogan 本身，不要引号，不要任何其他内容。' },
         { role: 'user', content: prompt },
       ],
       stream: false,
-      max_tokens: 30,
+      max_tokens: 2000,
     }),
   })
 
   if (!response.ok) throw new Error('生成 slogan 失败')
 
   const data = await response.json()
-  return data.choices?.[0]?.message?.content?.trim() || ''
+  const content = data.choices?.[0]?.message?.content?.trim()
+  if (content) return content
+
+  // fallback: 从 reasoning_content 提取
+  const reasoning = data.choices?.[0]?.message?.reasoning_content
+  if (reasoning) {
+    const lines = reasoning.split('\n').filter(l => l.trim())
+    return lines[lines.length - 1]?.trim() || ''
+  }
+
+  return ''
 }
 
 /**
@@ -245,11 +324,7 @@ export async function generateSlogan(prompt, config) {
 export async function testConnection(config) {
   try {
     const model = getCurrentModelConfig(config)
-
-    const headers = { 'Content-Type': 'application/json' }
-    if (model.apiKey) {
-      headers['Authorization'] = `Bearer ${model.apiKey}`
-    }
+    const headers = buildAuthHeaders(model)
 
     const response = await fetch(`${model.baseUrl}/chat/completions`, {
       method: 'POST',

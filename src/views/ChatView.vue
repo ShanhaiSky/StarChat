@@ -106,7 +106,7 @@
     </div>
 
     <!-- 输入区域 -->
-    <div class="input-area">
+    <div class="input-area" :class="{ 'slide-up': appReady }">
       <div class="input-container" :class="{ focused: isFocused }">
         <!-- 输入框 -->
         <textarea
@@ -161,7 +161,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick, watch, computed, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, nextTick, watch, computed, onUnmounted, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
@@ -176,6 +176,7 @@ const router = useRouter()
 const chatStore = useChatStore()
 const usageStore = useUsageStore()
 const sloganStore = useSloganStore()
+const appReady = inject('appReady', ref(false))
 
 // ── State ──
 const messagesRef = ref()
@@ -186,6 +187,7 @@ const isFocused = ref(false)
 const messages = ref([])
 const config = ref(getLLMConfig())
 const showPlanets = ref(false)
+const currentAssistantMsg = ref(null)
 let abortController = null
 
 // ── 行星（提示词）生成 ──
@@ -427,6 +429,7 @@ async function sendMessage() {
     tools: [],
   })
   messages.value.push(assistantMsg)
+  currentAssistantMsg.value = assistantMsg
   isStreaming.value = true
 
   // 构建消息历史（发送给 LLM）
@@ -471,6 +474,7 @@ async function sendMessage() {
     }
   } finally {
     isStreaming.value = false
+    currentAssistantMsg.value = null
     abortController = null
 
     // 渲染 Mermaid 图表（延迟一帧确保 DOM 已更新）
@@ -1119,6 +1123,20 @@ function renderMd(text) {
   margin: 0 auto;
   position: relative;
   z-index: 3;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+/* ── 入场动画 ── */
+.input-area.slide-up {
+  animation: slide-up 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.1s forwards;
+}
+
+@keyframes slide-up {
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .input-container {

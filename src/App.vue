@@ -2,13 +2,11 @@
 <template>
   <div v-if="loading" class="app-loading" ref="loadingRef">
     <div class="loading-logo" ref="logoRef" :class="{ 'logo-fly': phase === 'fly' }" :style="flyStyle">
-      <!-- 旋转光环 -->
       <div class="loading-orbit">
         <div class="orbit-dot dot-1"></div>
         <div class="orbit-dot dot-2"></div>
         <div class="orbit-dot dot-3"></div>
       </div>
-      <!-- 渐变光环 -->
       <div class="loading-ring">
         <div class="loading-icon">✦</div>
       </div>
@@ -16,33 +14,42 @@
     <h2 class="loading-title" :class="{ hide: phase === 'fly' }">StarChat</h2>
   </div>
 
-  <router-view />
+  <router-view ref="routerViewRef" v-show="!loading" />
 </template>
 
 <script setup>
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, provide } from 'vue'
 
-const MIN_DISPLAY = 800   // 最短展示时间（兜底，防闪烁）
-const FLY_DURATION = 600  // 位移动画时长
+const FLY_DURATION = 600
 
 const loading = ref(true)
 const phase = ref('in')
 const logoRef = ref(null)
+const routerViewRef = ref(null)
 const flyStyle = ref({})
+const appReady = ref(false)
+
+// 提供给子组件
+provide('appReady', appReady)
 
 onMounted(async () => {
-  const start = Date.now()
-
-  // 等待实际加载完成（路由就绪 + 数据加载）
-  // 这里可以 await 任何异步初始化
-  await Promise.all([
-    waitForRouterReady(),
-    sleep(MIN_DISPLAY),  // 兜底：至少展示 MIN_DISPLAY
-  ])
+  // 等待 DOM 渲染完成
+  await nextTick()
+  await sleep(1200)
 
   // 位移到空状态 Logo
   phase.value = 'fly'
   await nextTick()
+
+  // 临时让 router-view 可见（用于计算位置）
+  const routerEl = routerViewRef.value?.$el || routerViewRef.value
+  if (routerEl) {
+    routerEl.style.display = ''
+    routerEl.style.opacity = '0'
+    routerEl.style.pointerEvents = 'none'
+  }
+
+  await sleep(50)
 
   const targetEl = document.querySelector('.chat-empty .logo-ring')
   const logoEl = logoRef.value
@@ -56,30 +63,19 @@ onMounted(async () => {
   }
 
   await sleep(FLY_DURATION)
-  loading.value = false
-})
 
-/** 等待路由就绪 */
-function waitForRouterReady() {
-  return new Promise(resolve => {
-    // router.isReady() 在 SPA 首次加载时 resolve
-    // 如果不需要等路由，直接 resolve 即可
-    const check = () => {
-      const app = document.querySelector('#app')
-      if (app && app.__vue_app__) {
-        const router = app.__vue_app__.config.globalProperties.$router
-        if (router?.isReady) {
-          router.isReady().then(resolve)
-        } else {
-          resolve()
-        }
-      } else {
-        requestAnimationFrame(check)
-      }
-    }
-    check()
-  })
-}
+  // 恢复 router-view 样式
+  if (routerEl) {
+    routerEl.style.opacity = ''
+    routerEl.style.pointerEvents = ''
+  }
+
+  loading.value = false
+
+  // 触发入场动画
+  await nextTick()
+  appReady.value = true
+})
 
 function sleep(ms) {
   return new Promise(r => setTimeout(r, ms))
@@ -98,7 +94,6 @@ function sleep(ms) {
   justify-content: center;
 }
 
-/* ── Logo 容器 ── */
 .loading-logo {
   position: relative;
   width: 80px;
@@ -113,7 +108,6 @@ function sleep(ms) {
   transform: translate(var(--dx, 0px), var(--dy, 0px));
 }
 
-/* ── 旋转光环 ── */
 .loading-orbit {
   position: absolute;
   inset: -8px;
@@ -156,7 +150,6 @@ function sleep(ms) {
   animation: dot-pulse-3 2s ease-in-out 0.6s infinite;
 }
 
-/* ── 渐变光环 Logo ── */
 .loading-ring {
   width: 56px;
   height: 56px;
@@ -182,7 +175,6 @@ function sleep(ms) {
   color: #fff;
 }
 
-/* ── 标题 ── */
 .loading-title {
   font-size: 18px;
   font-weight: 600;
@@ -196,7 +188,6 @@ function sleep(ms) {
   opacity: 0;
 }
 
-/* ── 动画 ── */
 @keyframes orbit-spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
