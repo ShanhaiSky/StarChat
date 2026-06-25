@@ -188,6 +188,7 @@ const messages = ref([])
 const config = ref(getLLMConfig())
 const showPlanets = ref(false)
 const currentAssistantMsg = ref(null)
+const isAtBottom = ref(true) // 跟踪用户是否在底部
 let abortController = null
 
 // ── 行星（提示词）生成 ──
@@ -357,10 +358,19 @@ onMounted(async () => {
   } else if (chatStore.currentSessionId) {
     router.replace(`/chat/${chatStore.currentSessionId}`)
   }
+
+  // 添加滚动事件监听
+  if (messagesRef.value) {
+    messagesRef.value.addEventListener('scroll', handleScroll)
+  }
 })
 
 onUnmounted(() => {
   abortController?.abort()
+  // 移除滚动事件监听
+  if (messagesRef.value) {
+    messagesRef.value.removeEventListener('scroll', handleScroll)
+  }
 })
 
 // 监听路由变化
@@ -464,7 +474,10 @@ async function sendMessage() {
           })
           break
       }
-      scrollToBottom()
+      // 只在用户在底部时才自动滚动
+      if (isAtBottom.value) {
+        scrollToBottom()
+      }
     }
   } catch (err) {
     if (err.name === 'AbortError') {
@@ -599,8 +612,21 @@ function scrollToBottom() {
   nextTick(() => {
     if (messagesRef.value) {
       messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+      isAtBottom.value = true
     }
   })
+}
+
+// 检查是否在底部（距离底部 50px 以内）
+function checkIfAtBottom() {
+  if (!messagesRef.value) return true
+  const { scrollTop, scrollHeight, clientHeight } = messagesRef.value
+  return scrollHeight - scrollTop - clientHeight < 50
+}
+
+// 处理用户滚动事件
+function handleScroll() {
+  isAtBottom.value = checkIfAtBottom()
 }
 
 function copyMessage(text) {
@@ -863,6 +889,7 @@ function renderMd(text) {
       line-height: 1.6;
       max-width: 80%;
       word-break: break-word;
+      white-space: pre-wrap;
     }
   }
 
