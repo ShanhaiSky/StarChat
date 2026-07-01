@@ -65,20 +65,48 @@
             </div>
           </div>
 
-          <!-- 工具调用 - 简洁行 -->
-          <div v-for="(tool, ti) in msg.tools" :key="ti" class="tool-item">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="tool-icon" :class="{ 'tool-done': tool.done }">
-              <path v-if="tool.done" d="M4.5 7.7002L6.99293 10.1931C6.99683 10.197 7.00317 10.197 7.00707 10.1931L11.5 5.7002" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <path v-if="tool.done" d="M15 8C15 11.866 11.866 15 8 15C4.13401 15 1 11.866 1 8C1 4.13401 4.13401 1 8 1C11.866 1 15 4.13401 15 8Z" stroke="currentColor" stroke-width="1" stroke-linejoin="round" fill="none"/>
-              <path v-else d="M13.25 5.5C12.5 3.32491 10.75 1.75 8 1.75C4.54822 1.75 1.75 4.54822 1.75 8C1.75 11.4518 4.54822 14.25 8 14.25C11.1114 14.25 13.6918 11.9764 14.1704 9" stroke="currentColor" stroke-width="1" stroke-linecap="round" fill="none"/>
-            </svg>
-            <span class="tool-name">{{ tool.name }}</span>
+          <!-- 工具调用 - 可展开查看输入输出 -->
+          <div v-for="(tool, ti) in msg.tools" :key="ti" class="tool-item" :class="{ 'tool-expanded': tool._expanded }">
+            <div class="tool-header" @click="tool._expanded = !tool._expanded">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="tool-icon" :class="{ 'tool-done': tool.done, 'tool-error': tool.error }">
+                <path v-if="tool.done && !tool.error" d="M4.5 7.7002L6.99293 10.1931C6.99683 10.197 7.00317 10.197 7.00707 10.1931L11.5 5.7002" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path v-if="tool.done && !tool.error" d="M15 8C15 11.866 11.866 15 8 15C4.13401 15 1 11.866 1 8C1 4.13401 4.13401 1 8 1C11.866 1 15 4.13401 15 8Z" stroke="currentColor" stroke-width="1" stroke-linejoin="round" fill="none"/>
+                <path v-else-if="tool.error" d="M5.5 5.5L10.5 10.5M10.5 5.5L5.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path v-else d="M13.25 5.5C12.5 3.32491 10.75 1.75 8 1.75C4.54822 1.75 1.75 4.54822 1.75 8C1.75 11.4518 4.54822 14.25 8 14.25C11.1114 14.25 13.6918 11.9764 14.1704 9" stroke="currentColor" stroke-width="1" stroke-linecap="round" fill="none"/>
+              </svg>
+              <span class="tool-name">{{ tool.name }}</span>
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="tool-arrow">
+                <path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <!-- 工具详情（输入/输出） -->
+            <div v-show="tool._expanded" class="tool-details">
+              <div v-if="tool.args" class="tool-section">
+                <div class="tool-section-label">输入参数</div>
+                <pre class="tool-code">{{ formatJson(tool.args) }}</pre>
+              </div>
+              <!-- 返回结果：自动检测 ECharts 配置 -->
+              <div v-if="tool.result" class="tool-section">
+                <div class="tool-section-label">返回结果</div>
+                <template v-if="extractEchartsOption(tool.result)">
+                  <EchartsBlock :option="extractEchartsOption(tool.result)" />
+                </template>
+                <template v-else>
+                  <pre class="tool-code" :class="{ 'tool-code-collapsed': isLongResult(tool.result) && !tool._showFull }">{{ formatResult(tool.result) }}</pre>
+                  <button v-if="isLongResult(tool.result)" class="tool-toggle-btn" @click="tool._showFull = !tool._showFull">
+                    {{ tool._showFull ? '收起' : '展开全部' }}
+                  </button>
+                </template>
+              </div>
+              <div v-if="tool.error" class="tool-section tool-section-error">
+                <div class="tool-section-label">错误</div>
+                <pre class="tool-code">{{ tool.error }}</pre>
+              </div>
+            </div>
           </div>
 
-          <!-- 正文内容 -->
-          <div v-if="msg.content" class="message-content">
-            <div class="md-content" v-html="renderMd(msg.content)"></div>
-          </div>
+          <!-- 正文内容（自动识别 ECharts 图表） -->
+          <MessageContent v-if="msg.content" :content="msg.content" />
 
           <!-- 操作按钮 -->
           <div v-if="msg.content && !isStreaming" class="message-actions">
@@ -107,52 +135,79 @@
 
     <!-- 输入区域 -->
     <div class="input-area" :class="{ 'slide-up': appReady }">
-      <div class="input-container" :class="{ focused: isFocused }">
-        <!-- 输入框 -->
-        <textarea
-          ref="inputRef"
-          v-model="inputText"
-          class="input-textarea"
-          placeholder="输入消息，开始对话..."
-          @focus="isFocused = true"
-          @blur="isFocused = false"
-          @keydown="handleKeydown"
-          @input="autoResize"
-          :disabled="isStreaming"
-        ></textarea>
-
-        <!-- 底部工具栏 -->
-        <div class="input-toolbar">
-          <div class="toolbar-left">
-            <!-- 模型选择 -->
-            <el-select
-              v-model="config.currentModel"
-              class="model-select"
-            >
-              <el-option
-                v-for="m in config.models"
-                :key="m.name"
-                :label="m.name"
-                :value="m.name"
-              />
-            </el-select>
+      <div class="input-wrap" :class="{ focused: isFocused }">
+        <div class="input-container">
+          <!-- 已上传文件（在输入框上方） -->
+          <div v-if="pendingFiles.length > 0" class="uploaded-files">
+            <div v-for="(file, idx) in pendingFiles" :key="idx" class="uploaded-file" :class="getFileClass(file.type)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+              </svg>
+              <span class="file-name">{{ file.filename }}</span>
+              <button class="file-remove" @click="removePendingFile(idx)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
-          <div class="toolbar-right">
-            <!-- 发送/停止按钮 -->
-            <button
-              class="toolbar-btn send-btn"
-              :class="{ 'stop-btn': isStreaming }"
-              :title="isStreaming ? '停止生成' : canSend ? '发送' : ''"
-              @click="isStreaming ? stopGeneration() : canSend ? sendMessage() : null"
-            >
-              <svg v-if="isStreaming" viewBox="0 0 16 16" fill="currentColor" width="16" height="16">
-                <rect x="3" y="3" width="10" height="10" rx="2"/>
-              </svg>
-              <svg v-else viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
-                <path d="M8 13V3"/><path d="M3.5 7.5L8 3l4.5 4.5"/>
-              </svg>
-            </button>
+          <!-- 输入框 -->
+          <textarea
+            ref="inputRef"
+            v-model="inputText"
+            class="input-textarea"
+            placeholder="输入消息，开始对话..."
+            @focus="isFocused = true"
+            @blur="isFocused = false"
+            @keydown="handleKeydown"
+            @input="autoResize"
+            :disabled="isStreaming"
+          ></textarea>
+
+          <!-- 底部工具栏 -->
+          <div class="input-toolbar">
+            <div class="toolbar-left">
+              <!-- 文件上传按钮 -->
+              <button class="toolbar-btn" @click="triggerFileUpload" :disabled="isStreaming" title="上传文件">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+                </svg>
+              </button>
+              <!-- 隐藏的文件输入 -->
+              <input ref="fileInputRef" type="file" style="display: none" multiple @change="handleFileSelect" />
+              <!-- 模型选择 -->
+              <el-select
+                v-model="config.currentModel"
+                class="model-select"
+              >
+                <el-option
+                  v-for="m in config.models"
+                  :key="m.name"
+                  :label="m.name"
+                  :value="m.name"
+                />
+              </el-select>
+            </div>
+
+            <div class="toolbar-right">
+              <!-- 发送/停止按钮 -->
+              <button
+                class="toolbar-btn send-btn"
+                :class="{ 'stop-btn': isStreaming }"
+                :title="isStreaming ? '停止生成' : canSend ? '发送' : ''"
+                @click="isStreaming ? stopGeneration() : canSend ? sendMessage() : null"
+              >
+                <svg v-if="isStreaming" viewBox="0 0 16 16" fill="currentColor" width="16" height="16">
+                  <rect x="3" y="3" width="10" height="10" rx="2"/>
+                </svg>
+                <svg v-else viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+                  <path d="M8 13V3"/><path d="M3.5 7.5L8 3l4.5 4.5"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -168,7 +223,11 @@ import { useChatStore } from '@/stores/chat'
 import { useUsageStore } from '@/stores/usage'
 import { useSloganStore } from '@/stores/slogan'
 import { getLLMConfig, chatStream, generateTitle, generateSlogan } from '@/services/llm'
+import { getAllTools, callTool } from '@/services/mcp'
+import { uploadFile } from '@/services/minio'
 import { renderMarkdown, renderMermaidBlocks } from '@/utils/markdown'
+import MessageContent from '@/components/MessageContent.vue'
+import EchartsBlock from '@/components/EchartsBlock.vue'
 import { IconCode, IconAnalytics, IconEdit, IconTranslate, IconIdea, IconBook } from '@/icons'
 
 const route = useRoute()
@@ -189,6 +248,7 @@ const config = ref(getLLMConfig())
 const showPlanets = ref(false)
 const currentAssistantMsg = ref(null)
 const isAtBottom = ref(true) // 跟踪用户是否在底部
+const pendingFiles = ref([]) // 待发送的文件
 let abortController = null
 
 // ── 行星（提示词）生成 ──
@@ -421,17 +481,31 @@ async function sendMessage() {
 
   ensureSession()
 
+  // 构建消息内容（包含附件）
+  let messageContent = text
+  const attachments = [...pendingFiles.value]
+
+  if (attachments.length > 0) {
+    const fileLinks = attachments.map(f => `- [${f.filename}](${f.url})`).join('\n')
+    messageContent = `${text}\n\n**附件：**\n${fileLinks}`
+  }
+
   // 添加用户消息
-  const userMsg = { role: 'user', content: text }
+  const userMsg = {
+    role: 'user',
+    content: messageContent,
+    attachments: attachments.length > 0 ? attachments : undefined,
+  }
   chatStore.addMessage(chatStore.currentSessionId, userMsg)
   messages.value.push({ ...userMsg })
 
   inputText.value = ''
+  pendingFiles.value = []
   resetTextareaHeight()
   scrollToBottom()
 
   // 添加 assistant 消息占位
-  const assistantMsg = reactive({
+  let assistantMsg = reactive({
     role: 'assistant',
     content: '',
     thinking: null,
@@ -442,15 +516,99 @@ async function sendMessage() {
   currentAssistantMsg.value = assistantMsg
   isStreaming.value = true
 
+  // 记录本轮 assistant 消息的起始索引（用于保存到 store）
+  const assistantStartIdx = messages.value.length - 1
+
   // 构建消息历史（发送给 LLM）
   const chatMessages = buildChatMessages(text)
+
+  // 获取 MCP 工具
+  const mcpTools = getAllTools()
 
   abortController = new AbortController()
 
   try {
-    const stream = chatStream(chatMessages, config.value, abortController.signal)
+    // 执行 LLM 流式调用 + 工具循环
+    assistantMsg = await streamWithToolLoop(assistantMsg, chatMessages, mcpTools)
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      assistantMsg.content += '\n\n*[已停止生成]*'
+    } else {
+      assistantMsg.content = `请求失败: ${err.message}`
+    }
+  } finally {
+    isStreaming.value = false
+    currentAssistantMsg.value = null
+    abortController = null
+
+    // 渲染 Mermaid 图表（延迟一帧确保 DOM 已更新）
+    nextTick(() => renderMermaidBlocks())
+
+    scrollToBottom()
+
+    // 保存本轮所有 assistant 消息到 store
+    saveAssistantMessages(assistantStartIdx)
+
+    // 生成标题
+    try {
+      const title = await generateTitle(text, config.value)
+      if (title) {
+        chatStore.updateSessionTitle(chatStore.currentSessionId, title)
+      }
+    } catch (e) {
+      console.error('生成标题失败:', e)
+    }
+
+    // 生成新 slogan（异步，不阻塞）
+    generateNewSlogan(text)
+  }
+}
+
+/**
+ * 保存本轮所有 assistant 消息到 store
+ * @param {number} startIdx - 本轮 assistant 消息在 messages.value 中的起始索引
+ */
+function saveAssistantMessages(startIdx) {
+  for (let i = startIdx; i < messages.value.length; i++) {
+    const m = messages.value[i]
+    if (m.role === 'assistant') {
+      chatStore.addMessage(chatStore.currentSessionId, {
+        role: 'assistant',
+        content: m.content,
+        thinking: m.thinking,
+        tools: m.tools.map(t => ({
+          id: t.id,
+          name: t.name,
+          args: t.args,
+          done: t.done,
+          result: t.result,
+          error: t.error,
+        })),
+      })
+    }
+  }
+}
+
+/**
+ * 流式调用 LLM，支持工具执行循环
+ * @param {Object} assistantMsg - 当前 assistant 消息（响应式）
+ * @param {Array} chatMessages - 发送给 LLM 的消息数组
+ * @param {Array} mcpTools - MCP 工具列表
+ * @returns {Promise<Object>} 最后一条 assistant 消息
+ */
+async function streamWithToolLoop(assistantMsg, chatMessages, mcpTools) {
+  const MAX_LOOPS = 10
+  let loopCount = 0
+
+  while (loopCount < MAX_LOOPS) {
+    loopCount++
+
+    // 调用 LLM 流式接口
+    const stream = chatStream(chatMessages, config.value, abortController.signal, mcpTools)
 
     for await (const chunk of stream) {
+      if (abortController?.signal.aborted) break
+
       switch (chunk.type) {
         case 'thinking':
           if (assistantMsg.thinking) {
@@ -474,48 +632,67 @@ async function sendMessage() {
           })
           break
       }
-      // 只在用户在底部时才自动滚动
       if (isAtBottom.value) {
         scrollToBottom()
       }
     }
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      assistantMsg.content += '\n\n*[已停止生成]*'
-    } else {
-      assistantMsg.content = `请求失败: ${err.message}`
-    }
-  } finally {
-    isStreaming.value = false
-    currentAssistantMsg.value = null
-    abortController = null
 
-    // 渲染 Mermaid 图表（延迟一帧确保 DOM 已更新）
-    nextTick(() => renderMermaidBlocks())
+    // 如果没有工具调用，结束循环
+    if (assistantMsg.tools.length === 0) break
 
-    scrollToBottom()
-
-    // 保存 assistant 消息到 store
-    chatStore.addMessage(chatStore.currentSessionId, {
+    // 将 assistant 的 tool_calls 加入消息历史
+    chatMessages.push({
       role: 'assistant',
-      content: assistantMsg.content,
-      thinking: assistantMsg.thinking,
-      tools: assistantMsg.tools.map(t => ({ ...t })),
+      content: assistantMsg.content || null,
+      tool_calls: assistantMsg.tools.map(t => ({
+        id: t.id,
+        type: 'function',
+        function: { name: t.name, arguments: t.args },
+      })),
     })
 
-    // 生成标题
-    try {
-      const title = await generateTitle(text, config.value)
-      if (title) {
-        chatStore.updateSessionTitle(chatStore.currentSessionId, title)
+    // 执行工具调用
+    for (const tool of assistantMsg.tools) {
+      if (abortController?.signal.aborted) break
+
+      try {
+        const args = JSON.parse(tool.args || '{}')
+        const result = await callTool(tool.name, args)
+        tool.done = true
+        tool.result = typeof result === 'string' ? result : JSON.stringify(result)
+
+        chatMessages.push({
+          role: 'tool',
+          tool_call_id: tool.id,
+          content: tool.result,
+        })
+      } catch (err) {
+        tool.done = true
+        tool.error = err.message
+        chatMessages.push({
+          role: 'tool',
+          tool_call_id: tool.id,
+          content: `Error: ${err.message}`,
+        })
       }
-    } catch (e) {
-      console.error('生成标题失败:', e)
     }
 
-    // 生成新 slogan（异步，不阻塞）
-    generateNewSlogan(text)
+    if (isAtBottom.value) scrollToBottom()
+
+    // 创建新的 assistant 消息占位，继续循环
+    assistantMsg = reactive({
+      role: 'assistant',
+      content: '',
+      thinking: null,
+      thinkingExpanded: false,
+      tools: [],
+    })
+    messages.value.push(assistantMsg)
+    currentAssistantMsg.value = assistantMsg
+    mcpTools = getAllTools() // 刷新工具列表
   }
+
+  return assistantMsg
 }
 
 /**
@@ -546,22 +723,60 @@ async function generateNewSlogan(latestUserMsg) {
 
 /**
  * 构建发送给 LLM 的消息数组
+ * 支持从历史消息中还原 tool_calls 和 tool results
  */
 function buildChatMessages(userText) {
   const systemMessage = {
     role: 'system',
-    content: '你是一个有用的 AI 助手。请用中文回答用户的问题。',
+    content: `你是一个有用的 AI 助手。请用中文回答用户的问题。
+
+当工具返回包含 echart_option 或 ECharts 配置的 JSON 时，你必须用 \`\`\`echarts 代码块包裹输出，以便前端自动渲染图表。例如：
+
+\`\`\`echarts
+{
+  "xAxis": { "type": "category", "data": ["1月", "2月"] },
+  "yAxis": { "type": "value" },
+  "series": [{ "type": "bar", "data": [100, 200] }]
+}
+\`\`\`
+
+不要把 ECharts 配置作为普通 JSON 输出，一定要用 \`\`\`echarts 包裹。`,
   }
 
   // 从 store 加载历史消息
   const history = chatStore.getMessages(chatStore.currentSessionId)
-    .filter(m => m.role === 'user' || (m.role === 'assistant' && m.content))
-    .map(m => ({
-      role: m.role,
-      content: m.content,
-    }))
+  const chatMessages = [systemMessage]
 
-  return [systemMessage, ...history]
+  for (const m of history) {
+    if (m.role === 'user') {
+      chatMessages.push({ role: 'user', content: m.content })
+    } else if (m.role === 'assistant') {
+      if (m.tools?.length) {
+        // 包含 tool_calls 的 assistant 消息
+        chatMessages.push({
+          role: 'assistant',
+          content: m.content || null,
+          tool_calls: m.tools.map(t => ({
+            id: t.id,
+            type: 'function',
+            function: { name: t.name, arguments: t.args },
+          })),
+        })
+        // 紧跟 tool result 消息
+        for (const t of m.tools) {
+          chatMessages.push({
+            role: 'tool',
+            tool_call_id: t.id,
+            content: t.result || t.error || '',
+          })
+        }
+      } else if (m.content) {
+        chatMessages.push({ role: 'assistant', content: m.content })
+      }
+    }
+  }
+
+  return chatMessages
 }
 
 /**
@@ -584,6 +799,51 @@ function handleToolCallDelta(msg, delta) {
 // ── 停止生成 ──
 function stopGeneration() {
   abortController?.abort()
+}
+
+// ── 文件上传 ──
+const fileInputRef = ref(null)
+const uploadingFile = ref(false)
+
+function triggerFileUpload() {
+  fileInputRef.value?.click()
+}
+
+async function handleFileSelect(e) {
+  const files = Array.from(e.target.files || [])
+  if (files.length === 0) return
+
+  uploadingFile.value = true
+  ElMessage.info(`正在上传 ${files.length} 个文件...`)
+
+  for (const file of files) {
+    try {
+      const result = await uploadFile(file, (percent) => {
+        // 可以在这里显示进度
+      })
+      pendingFiles.value.push(result)
+      ElMessage.success(`"${file.name}" 上传成功`)
+    } catch (err) {
+      ElMessage.error(`"${file.name}" 上传失败: ${err.message}`)
+    }
+  }
+
+  uploadingFile.value = false
+  e.target.value = '' // 清空 input
+}
+
+function removePendingFile(idx) {
+  pendingFiles.value.splice(idx, 1)
+}
+
+function getFileClass(mimeType) {
+  if (!mimeType) return 'file-tag--text'
+  if (mimeType.startsWith('image/')) return 'file-tag--image'
+  if (mimeType.startsWith('video/')) return 'file-tag--video'
+  if (mimeType.includes('pdf')) return 'file-tag--pdf'
+  if (mimeType.includes('word') || mimeType.includes('document')) return 'file-tag--word'
+  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('7z')) return 'file-tag--archive'
+  return 'file-tag--text'
 }
 
 // ── 工具函数 ──
@@ -632,6 +892,84 @@ function handleScroll() {
 function copyMessage(text) {
   navigator.clipboard.writeText(text)
   ElMessage.success('已复制')
+}
+
+/**
+ * 格式化 JSON 字符串
+ */
+function formatJson(str) {
+  try {
+    return JSON.stringify(JSON.parse(str), null, 2)
+  } catch {
+    return str
+  }
+}
+
+/**
+ * 判断结果是否过长（超过 500 字符）
+ */
+function isLongResult(str) {
+  return str && str.length > 500
+}
+
+/**
+ * 格式化工具返回结果
+ * 短结果直接显示，长结果根据 _showFull 状态显示
+ */
+function formatResult(str) {
+  if (!str) return ''
+  // 尝试 JSON 格式化
+  try {
+    const obj = JSON.parse(str)
+    return JSON.stringify(obj, null, 2)
+  } catch {
+    return str
+  }
+}
+
+/**
+ * 从工具返回结果中提取 ECharts 配置
+ * 支持多种格式：
+ * 1. 直接返回 echart_option 字段
+ * 2. 返回包含 echart_option 的对象
+ * 3. 直接返回 ECharts 配置对象
+ */
+function extractEchartsOption(resultStr) {
+  if (!resultStr) return null
+
+  try {
+    const data = JSON.parse(resultStr)
+
+    // 格式 1: { echart_option: {...} }
+    if (data.echart_option && typeof data.echart_option === 'object') {
+      return data.echart_option
+    }
+
+    // 格式 2: { type: "echarts", option: {...} }
+    if (data.type === 'echarts' && data.option) {
+      return data.option
+    }
+
+    // 格式 3: 直接是 ECharts 配置（有 series/xAxis/yAxis/radar 等字段）
+    if (data && (data.series || data.xAxis || data.yAxis || data.radar || data.legend)) {
+      return data
+    }
+
+    // 格式 4: { data: { echart_option: {...} } }（嵌套一层）
+    if (data.data?.echart_option) {
+      return data.data.echart_option
+    }
+  } catch {
+    // 不是 JSON，尝试用正则提取
+    const match = resultStr.match(/"echart_option"\s*:\s*(\{[\s\S]*?\})\s*[,}]/)
+    if (match) {
+      try {
+        return JSON.parse(match[1])
+      } catch {}
+    }
+  }
+
+  return null
 }
 
 function renderMd(text) {
@@ -962,24 +1300,127 @@ function renderMd(text) {
 
 /* ── 工具调用 ── */
 .tool-item {
-  display: inline-flex;
+  margin-bottom: 8px;
+  font-size: 12px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.tool-header {
+  display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  margin-bottom: 4px;
-  font-size: 12px;
-  color: #666;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
 
-  .tool-icon {
-    color: #999;
+  &:hover {
+    background: #f5f5f5;
+  }
+}
 
-    &.tool-done {
-      color: #20804E;
-    }
+.tool-icon {
+  color: #999;
+  flex-shrink: 0;
+
+  &.tool-done {
+    color: #20804E;
   }
 
-  .tool-name {
-    color: #333;
+  &.tool-error {
+    color: #dc2626;
+  }
+}
+
+.tool-name {
+  color: #333;
+  font-weight: 500;
+}
+
+.tool-arrow {
+  margin-left: auto;
+  color: #999;
+  transition: transform 0.2s;
+}
+
+.tool-expanded .tool-arrow {
+  transform: rotate(90deg);
+}
+
+.tool-details {
+  border-top: 1px solid #e8e8e8;
+  padding: 8px 12px;
+  background: #fafafa;
+}
+
+.tool-section {
+  margin-bottom: 8px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.tool-section-label {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 4px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.tool-section-error .tool-section-label {
+  color: #dc2626;
+}
+
+.tool-code {
+  margin: 0;
+  padding: 8px 10px;
+  background: #f0f0f0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  color: #333;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.tool-code-collapsed {
+  max-height: 150px;
+  overflow-y: hidden;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: linear-gradient(transparent, #f0f0f0);
+    pointer-events: none;
+  }
+}
+
+.tool-toggle-btn {
+  display: block;
+  width: 100%;
+  padding: 6px;
+  margin-top: 4px;
+  border: none;
+  border-radius: 4px;
+  background: #e5e7eb;
+  color: #4b5563;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #d1d5db;
+    color: #1f2937;
   }
 }
 
@@ -1166,45 +1607,24 @@ function renderMd(text) {
   }
 }
 
-.input-container {
+/* 输入框包裹层 */
+.input-wrap {
   width: 100%;
   margin: 0 auto;
   max-width: 800px;
-  background: rgba(255, 255, 255, 0.92);
   border-radius: 22px;
-  overflow: visible;
+  padding: 1px;
   position: relative;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: none;
+  background: rgba(200, 204, 214, 0.5);
   transition: all 0.3s ease;
   box-shadow: 0 22px 70px rgba(16, 24, 40, 0.12);
-  padding: 16px;
 
   &.focused {
-    box-shadow: 0 0 0 3px rgba(255, 146, 92, 0.15), 0 0 30px rgba(124, 58, 237, 0.12), 0 0 60px rgba(255, 146, 92, 0.08), 0 22px 70px rgba(16, 24, 40, 0.12);
+    background: linear-gradient(135deg, rgba(255, 146, 92, 0.9), rgba(255, 195, 103, 0.55), rgba(123, 97, 255, 0.65), rgba(255, 146, 92, 0.85));
+    box-shadow: 0 0 30px rgba(124, 58, 237, 0.12), 0 0 60px rgba(255, 146, 92, 0.08), 0 22px 70px rgba(16, 24, 40, 0.12);
   }
 
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 22px;
-    padding: 1.5px;
-    background: linear-gradient(90deg, rgba(255, 146, 92, 0.9), rgba(255, 195, 103, 0.55), rgba(123, 97, 255, 0.65), rgba(255, 146, 92, 0.85));
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-
-  &.focused::before {
-    opacity: 1;
-  }
-
+  /* 外辉光 */
   &::after {
     content: '';
     position: absolute;
@@ -1220,6 +1640,15 @@ function renderMd(text) {
   &.focused::after {
     opacity: 1;
   }
+}
+
+.input-container {
+  width: 100%;
+  background: #fff;
+  border-radius: calc(22px - 1px);
+  position: relative;
+  transition: all 0.3s ease;
+  padding: 16px;
 }
 
 /* ── 输入框 ── */
@@ -1359,5 +1788,97 @@ function renderMd(text) {
       box-shadow: 0 16px 34px rgba(16, 24, 40, 0.24);
     }
   }
+}
+
+/* ── 已上传文件 ── */
+/* ── 已上传文件 ── */
+.uploaded-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 8px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.uploaded-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #4b5563;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.uploaded-file:hover {
+  background: #e5e7eb;
+}
+
+.file-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-remove {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.file-remove:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* 文件类型颜色 */
+.file-tag--image {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.file-tag--video {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.file-tag--pdf {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.file-tag--word {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.file-tag--archive {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.file-tag--text {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+  color: #4b5563;
 }
 </style>

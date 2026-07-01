@@ -2,11 +2,58 @@
 <template>
   <div class="settings-view">
     <div class="settings-container">
-      <h1 class="settings-title">设置</h1>
+      <div class="settings-header">
+        <h1 class="settings-title">设置</h1>
+        <span class="settings-version">v1.2</span>
+      </div>
+
+      <!-- 更新日志 Banner -->
+      <div v-if="showUpdateBanner" class="update-banner" :class="{ expanded: bannerExpanded }">
+        <div class="banner-header" @click="bannerExpanded = !bannerExpanded">
+          <div class="banner-title">
+            <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#10b981"/>
+            </svg>
+            <span>🎉 StarChat v1.2 更新</span>
+          </div>
+          <svg viewBox="0 0 16 16" fill="none" width="14" height="14" class="banner-arrow">
+            <path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div v-show="bannerExpanded" class="banner-content">
+          <div class="update-item">
+            <span class="update-tag new">新功能</span>
+            <span class="update-text">MCP 服务支持 — 连接外部工具，扩展 AI 能力</span>
+          </div>
+          <div class="update-item">
+            <span class="update-tag new">新功能</span>
+            <span class="update-text">ECharts 图表渲染 — AI 自动生成可视化图表</span>
+          </div>
+          <div class="update-item">
+            <span class="update-tag new">新功能</span>
+            <span class="update-text">MinIO 文件上传 — 支持拖拽上传文件到对话</span>
+          </div>
+          <div class="update-item">
+            <span class="update-tag new">新功能</span>
+            <span class="update-text">工具调用详情 — 展示工具输入输出参数</span>
+          </div>
+          <div class="update-item">
+            <span class="update-tag improve">优化</span>
+            <span class="update-text">侧边栏布局优化 — 新增新建对话按钮</span>
+          </div>
+          <div class="update-item">
+            <span class="update-tag improve">优化</span>
+            <span class="update-text">流式输出稳定性 — 修复图表渲染闪烁问题</span>
+          </div>
+          <button class="banner-close" @click="closeBanner">我知道了</button>
+        </div>
+      </div>
 
       <!-- Tab 切换 -->
       <div class="tab-bar">
         <button class="tab-btn" :class="{ active: tab === 'config' }" @click="tab = 'config'">模型配置</button>
+        <button class="tab-btn" :class="{ active: tab === 'mcp' }" @click="tab = 'mcp'">MCP 服务</button>
+        <button class="tab-btn" :class="{ active: tab === 'storage' }" @click="tab = 'storage'">存储配置</button>
         <button class="tab-btn" :class="{ active: tab === 'usage' }" @click="tab = 'usage'">用量看板</button>
       </div>
 
@@ -102,6 +149,123 @@
         </div>
 
         <div v-if="testResult" class="test-result" :class="{ success: testResult.success }">{{ testResult.message }}</div>
+      </div>
+
+      <!-- MCP 服务配置 -->
+      <div v-show="tab === 'mcp'" class="settings-form">
+        <div class="form-group">
+          <label class="form-label">MCP 服务器列表</label>
+          <p class="form-hint" style="margin-bottom: 12px">支持 SSE 和 StreamableHTTP 两种传输方式，可配置认证头</p>
+          <div class="model-list">
+            <div
+              v-for="s in mcpStore.servers"
+              :key="s.id"
+              class="model-card"
+              :class="{ active: mcpStatus[s.id]?.status === 'connected' }"
+            >
+              <div class="model-header">
+                <div class="model-name-row">
+                  <el-input v-model="s.name" placeholder="服务器名称" class="model-name-input" @change="mcpStore.updateServer(s.id, { name: s.name })" />
+                  <span v-if="mcpStatus[s.id]?.status === 'connected'" class="current-badge" style="background: rgba(34,197,94,0.08); color: #16a34a;">已连接</span>
+                  <span v-else-if="mcpStatus[s.id]?.status === 'connecting'" class="current-badge" style="background: rgba(234,179,8,0.08); color: #ca8a04;">连接中</span>
+                  <span v-else-if="mcpStatus[s.id]?.status === 'error'" class="current-badge" style="background: rgba(239,68,68,0.08); color: #dc2626;">错误</span>
+                </div>
+                <div class="model-actions">
+                  <el-button text class="model-act-btn" :class="{ active: s.enabled }" @click="mcpStore.toggleServer(s.id)" :title="s.enabled ? '禁用' : '启用'">
+                    <template v-if="s.enabled">
+                      <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M4.5 7.7L6.99 10.19a.5.5 0 00.71 0L11.5 5.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+                    </template>
+                    <template v-else>
+                      <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1" fill="none"/></svg>
+                    </template>
+                  </el-button>
+                  <el-button text class="model-act-btn delete" @click="handleRemoveMcpServer(s.id)">
+                    <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  </el-button>
+                </div>
+              </div>
+              <div class="model-fields">
+                <div class="field-row">
+                  <label class="field-label">URL</label>
+                  <el-input v-model="s.url" placeholder="https://example.com/mcp" size="small" @change="mcpStore.updateServer(s.id, { url: s.url })" />
+                </div>
+                <div class="field-row">
+                  <label class="field-label">传输方式</label>
+                  <el-select v-model="s.type" size="small" style="flex:1" @change="mcpStore.updateServer(s.id, { type: s.type })">
+                    <el-option label="SSE（传统）" value="sse" />
+                    <el-option label="StreamableHTTP（推荐）" value="streamableHttp" />
+                  </el-select>
+                </div>
+                <div class="field-row">
+                  <label class="field-label">Authorization</label>
+                  <el-input v-model="s.headers.Authorization" placeholder="Bearer your-api-key" size="small" @change="mcpStore.updateServer(s.id, { headers: s.headers })" />
+                </div>
+                <div class="field-row">
+                  <label class="field-label">自动连接</label>
+                  <el-switch v-model="s.autoConnect" size="small" @change="mcpStore.updateServer(s.id, { autoConnect: s.autoConnect })" />
+                </div>
+                <div class="field-row">
+                  <label class="field-label">操作</label>
+                  <div style="display: flex; gap: 8px; flex: 1">
+                    <el-button v-if="mcpStatus[s.id]?.status !== 'connected'" size="small" type="primary" @click="handleConnectMcp(s)" :loading="mcpStatus[s.id]?.status === 'connecting'">连接</el-button>
+                    <el-button v-else size="small" @click="handleDisconnectMcp(s.id)">断开</el-button>
+                  </div>
+                </div>
+                <div v-if="mcpStatus[s.id]?.error" class="test-result" style="margin-top: 8px">
+                  {{ mcpStatus[s.id].error }}
+                </div>
+                <!-- 已发现工具列表 -->
+                <div v-if="mcpStatus[s.id]?.tools?.length" class="mcp-tools-list">
+                  <div class="mcp-tools-title">已发现工具 ({{ mcpStatus[s.id].tools.length }})</div>
+                  <div v-for="tool in mcpStatus[s.id].tools" :key="tool.name" class="mcp-tool-item">
+                    <span class="mcp-tool-name">{{ tool.name }}</span>
+                    <span class="mcp-tool-desc">{{ tool.description }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <el-button text class="add-model-btn" @click="handleAddMcpServer">
+            <svg viewBox="0 0 16 16" fill="none" width="14" height="14"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            添加 MCP 服务器
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 存储配置 -->
+      <div v-show="tab === 'storage'" class="settings-form">
+        <div class="form-group">
+          <label class="form-label">MinIO 对象存储</label>
+          <p class="form-hint" style="margin-bottom: 16px">配置 MinIO 服务，支持文件上传到对话中</p>
+
+          <div class="model-fields" style="gap: 12px">
+            <div class="field-row">
+              <label class="field-label">Endpoint</label>
+              <el-input v-model="minioForm.endpoint" placeholder="http://localhost:9000" size="small" />
+            </div>
+            <div class="field-row">
+              <label class="field-label">Access Key</label>
+              <el-input v-model="minioForm.accessKey" placeholder="minioadmin" size="small" />
+            </div>
+            <div class="field-row">
+              <label class="field-label">Secret Key</label>
+              <el-input v-model="minioForm.secretKey" type="password" show-password placeholder="minioadmin" size="small" />
+            </div>
+            <div class="field-row">
+              <label class="field-label">Bucket</label>
+              <el-input v-model="minioForm.bucket" placeholder="starchat" size="small" />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <el-button type="primary" @click="handleSaveMinio" :loading="minioSaving">保存配置</el-button>
+            <el-button @click="handleTestMinio" :loading="minioTesting">测试连接</el-button>
+          </div>
+
+          <div v-if="minioTestResult" class="test-result" :class="{ success: minioTestResult.success }">
+            {{ minioTestResult.message }}
+          </div>
+        </div>
       </div>
 
       <!-- 用量看板 -->
@@ -204,13 +368,32 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getLLMConfig, setLLMConfig, testConnection } from '@/services/llm'
 import { useUsageStore } from '@/stores/usage'
+import { useMcpStore } from '@/stores/mcp'
+import { connectServer, disconnectServer, getServerStatus, onConnectionChange } from '@/services/mcp'
+import { getMinioConfig, setMinioConfig, testMinioConnection } from '@/services/minio'
 
 const usageStore = useUsageStore()
+const mcpStore = useMcpStore()
 const tab = ref('config')
+
+// MCP 连接状态（响应式）
+const mcpStatus = reactive({})
+let unsubMcp = null
+
+// MinIO 状态
+const minioForm = ref(getMinioConfig())
+const minioSaving = ref(false)
+const minioTesting = ref(false)
+const minioTestResult = ref(null)
+
+// 更新日志 Banner
+const BANNER_KEY = 'audichat_update_banner_v1.2'
+const showUpdateBanner = ref(!localStorage.getItem(BANNER_KEY))
+const bannerExpanded = ref(true)
 
 const form = ref({
   models: [{ name: 'deepseek-v4-flash', baseUrl: 'https://api.deepseek.com/v1', apiKey: '', authType: 'bearer', authHeaderName: '', thinkingMode: 'off' }],
@@ -228,6 +411,18 @@ const currentModelConfig = computed(() => {
 
 onMounted(() => {
   form.value = JSON.parse(JSON.stringify(getLLMConfig()))
+
+  // 初始化 MCP 状态
+  mcpStore.servers.forEach(s => {
+    mcpStatus[s.id] = getServerStatus(s.id)
+  })
+
+  // 监听 MCP 连接状态变更
+  unsubMcp = onConnectionChange(snapshot => {
+    for (const [id, status] of Object.entries(snapshot)) {
+      mcpStatus[id] = status
+    }
+  })
 })
 
 function addModel() {
@@ -303,6 +498,75 @@ async function handleClearUsage() {
     ElMessage.success('已清空')
   } catch {}
 }
+
+// ── MCP 操作 ──
+function handleAddMcpServer() {
+  const server = mcpStore.addServer({
+    name: 'MCP Server',
+    url: '',
+    type: 'streamableHttp',
+    headers: {},
+  })
+  mcpStatus[server.id] = { status: 'disconnected', tools: [], error: null }
+}
+
+async function handleRemoveMcpServer(id) {
+  try {
+    await ElMessageBox.confirm('确定删除这个 MCP 服务器吗？', '确认')
+    await disconnectServer(id)
+    mcpStore.removeServer(id)
+    delete mcpStatus[id]
+    ElMessage.success('已删除')
+  } catch {}
+}
+
+async function handleConnectMcp(server) {
+  if (!server.url) {
+    ElMessage.warning('请先填写服务器 URL')
+    return
+  }
+  mcpStatus[server.id] = { status: 'connecting', tools: [], error: null }
+  try {
+    await connectServer(server)
+    mcpStatus[server.id] = getServerStatus(server.id)
+    ElMessage.success(`已连接 "${server.name}"，发现 ${mcpStatus[server.id].tools.length} 个工具`)
+  } catch (err) {
+    mcpStatus[server.id] = getServerStatus(server.id)
+    ElMessage.error(`连接失败: ${err.message}`)
+  }
+}
+
+async function handleDisconnectMcp(serverId) {
+  await disconnectServer(serverId)
+  mcpStatus[serverId] = { status: 'disconnected', tools: [], error: null }
+  ElMessage.success('已断开')
+}
+
+// ── MinIO 操作 ──
+function handleSaveMinio() {
+  minioSaving.value = true
+  try {
+    setMinioConfig(minioForm.value)
+    ElMessage.success('MinIO 配置已保存')
+  } finally {
+    minioSaving.value = false
+  }
+}
+
+async function handleTestMinio() {
+  minioTesting.value = true
+  minioTestResult.value = null
+  try {
+    minioTestResult.value = await testMinioConnection(minioForm.value)
+  } finally {
+    minioTesting.value = false
+  }
+}
+
+function closeBanner() {
+  showUpdateBanner.value = false
+  localStorage.setItem(BANNER_KEY, 'closed')
+}
 </script>
 
 <style scoped lang="scss">
@@ -318,11 +582,130 @@ async function handleClearUsage() {
   margin: 0 auto;
 }
 
+/* ── 设置头部 ── */
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
 .settings-title {
   font-size: 24px;
   font-weight: 600;
   color: var(--text-primary);
+  margin: 0;
+}
+
+.settings-version {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+}
+
+/* ── 更新日志 Banner ── */
+.update-banner {
   margin-bottom: 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+  transition: all 0.2s;
+}
+
+.banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #f9fafb;
+  }
+}
+
+.banner-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.banner-arrow {
+  color: #9ca3af;
+  transition: transform 0.2s;
+}
+
+.update-banner.expanded .banner-arrow {
+  transform: rotate(90deg);
+}
+
+.banner-content {
+  padding: 0 16px 16px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.update-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f9fafb;
+
+  &:last-of-type {
+    border-bottom: none;
+  }
+}
+
+.update-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+
+  &.new {
+    background: #dbeafe;
+    color: #2563eb;
+  }
+
+  &.improve {
+    background: #fef3c7;
+    color: #d97706;
+  }
+}
+
+.update-text {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.banner-close {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 8px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: #e5e7eb;
+    color: #1f2937;
+  }
 }
 
 /* ── Tab ── */
@@ -644,6 +1027,47 @@ async function handleClearUsage() {
 .record-time { color: var(--text-muted); }
 .record-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .record-total { font-weight: 600; color: var(--text-primary); }
+
+/* ── MCP 工具列表 ── */
+.mcp-tools-list {
+  margin-top: 8px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  border: 1px solid var(--border-light);
+}
+
+.mcp-tools-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.mcp-tool-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-light);
+
+  &:last-child { border-bottom: none; }
+}
+
+.mcp-tool-name {
+  font-weight: 600;
+  color: #3049C6;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  white-space: nowrap;
+}
+
+.mcp-tool-desc {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ── 致谢 ── */
 .settings-footer {

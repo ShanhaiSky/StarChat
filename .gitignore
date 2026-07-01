@@ -3,7 +3,19 @@ dist
 .DS_Store
 *.local
 
+# Environment variables
+.env
+.env.*
+!.env.example
+
 # Build output
 release/
 dist/
 node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db

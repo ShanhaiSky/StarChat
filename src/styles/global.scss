@@ -362,6 +362,87 @@ html, body, #app {
   }
 }
 
+/* ── ECharts 图表 ── */
+.echarts-block {
+  margin-bottom: 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.echarts-body {
+  padding: 16px;
+  min-height: 300px;
+}
+
+.echarts-view {
+  width: 100%;
+  min-height: 300px;
+}
+
+.echarts-loading {
+  padding: 24px;
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+}
+
+.echarts-code {
+  pre {
+    margin: 0;
+    padding: 14px 16px;
+    background: #f8f9fa;
+    overflow-x: auto;
+  }
+
+  code {
+    background: none;
+    padding: 0;
+    font-size: 13px;
+    color: #383a42;
+  }
+}
+
+.echarts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  background: #f0f0f0;
+  border-top: 1px solid #e8e8e8;
+
+  .code-lang { font-size: 11px; color: #999; font-weight: 500; text-transform: uppercase; }
+  .echarts-toolbar-right { display: flex; align-items: center; gap: 4px; }
+}
+
+.echarts-error-wrap {
+  .echarts-body {
+    background: #fef2f2;
+    min-height: auto;
+  }
+}
+
+.echarts-error {
+  .echarts-error-label {
+    display: block;
+    font-size: 12px;
+    color: #dc2626;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  pre {
+    margin: 0;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 6px;
+    font-size: 12px;
+    color: #666;
+    overflow-x: auto;
+  }
+}
+
 /* ── highlight.js 浅色主题 ── */
 .hljs { color: #383a42; }
 .hljs-keyword { color: #a626a4; font-weight: 500; }

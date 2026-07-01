@@ -119,9 +119,10 @@ function buildAuthHeaders(model) {
  * @param {Array} messages - OpenAI 格式的消息数组
  * @param {Object} config - LLM 配置
  * @param {AbortSignal} signal - 可选的 AbortSignal
+ * @param {Array} tools - MCP 工具定义数组（可选）
  * @yields {{ type: string, content: string }}
  */
-export async function* chatStream(messages, config, signal) {
+export async function* chatStream(messages, config, signal, tools) {
   const model = getCurrentModelConfig(config)
   const { supportsReasoning } = config
 
@@ -130,6 +131,18 @@ export async function* chatStream(messages, config, signal) {
     messages,
     stream: true,
     stream_options: { include_usage: true },
+  }
+
+  // 注入 MCP 工具定义
+  if (tools?.length) {
+    body.tools = tools.map(t => ({
+      type: 'function',
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema || { type: 'object', properties: {} },
+      },
+    }))
   }
 
   // 添加思考模式参数（适用于 x-apikey 模式的 API）

@@ -13,6 +13,15 @@
 
       <!-- 导航菜单 -->
       <nav class="sidebar-nav">
+        <!-- 新建对话按钮 -->
+        <button v-show="!isCollapsed" class="new-chat-btn" @click="createNewSession">
+          <IconAdd :size="16" />
+          <span>新建对话</span>
+        </button>
+        <button v-show="isCollapsed" class="new-chat-btn new-chat-btn--icon" @click="createNewSession" title="新建对话">
+          <IconAdd :size="18" />
+        </button>
+
         <!-- 对话组 -->
         <div class="nav-group" :class="{ expanded: chatExpanded }">
           <div class="nav-item group-header" :class="{ active: isChatActive }" @click="toggleChatGroup">
@@ -23,12 +32,6 @@
 
           <!-- 会话列表子菜单 -->
           <div v-show="!isCollapsed && chatExpanded" class="sub-menu">
-            <div class="sub-menu-header">
-              <span class="sub-menu-title">对话列表</span>
-              <el-button text class="add-session-btn" @click.stop="createNewSession">
-                <IconAdd :size="14" />
-              </el-button>
-            </div>
             <div class="session-list">
               <div
                 v-for="session in chatStore.sortedSessions"
@@ -53,20 +56,20 @@
           </div>
         </div>
 
-        <!-- 设置 -->
-        <router-link to="/settings" class="nav-item" :class="{ active: isSettingsActive }">
-          <IconSettings :size="20" />
-          <span v-show="!isCollapsed" class="nav-text">设置</span>
-        </router-link>
       </nav>
 
       <!-- 底部 -->
-      <div class="sidebar-footer">
+      <div class="sidebar-footer" :class="{ 'sidebar-footer--collapsed': isCollapsed }">
+        <!-- 设置 -->
+        <router-link to="/settings" class="footer-item" :class="{ active: isSettingsActive }" title="设置">
+          <IconSettings :size="18" />
+          <span v-show="!isCollapsed" class="footer-text">设置</span>
+        </router-link>
+        <!-- 折叠/展开按钮 -->
         <el-button text class="collapse-btn" @click="isCollapsed = !isCollapsed">
           <IconSidebarLeft v-if="!isCollapsed" :size="18" />
           <IconSidebarRight v-else :size="18" />
         </el-button>
-        <span v-show="!isCollapsed" class="version">v1.0</span>
       </div>
     </aside>
 
@@ -86,6 +89,8 @@ import { ref, computed, onMounted, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
+import { useMcpStore } from '@/stores/mcp'
+import { autoConnectAll } from '@/services/mcp'
 import {
   IconChat, IconSettings, IconAdd, IconDelete,
   IconSidebarLeft, IconSidebarRight, IconArrowDown,
@@ -94,6 +99,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const chatStore = useChatStore()
+const mcpStore = useMcpStore()
 const isCollapsed = ref(false)
 const chatExpanded = ref(true)
 const appReady = inject('appReady', ref(false))
@@ -106,8 +112,14 @@ const isSettingsActive = computed(() => {
   return route.path === '/settings'
 })
 
-onMounted(() => {
+onMounted(async () => {
   chatStore.loadSessions()
+
+  // 自动连接标记为 autoConnect 的 MCP 服务器
+  if (mcpStore.servers.length > 0) {
+    console.log('[MCP] 自动连接 MCP 服务器...')
+    await autoConnectAll(mcpStore.servers)
+  }
 })
 
 function toggleChatGroup() {
@@ -229,6 +241,37 @@ async function deleteSession(id) {
   flex: 1;
   padding: 0 8px;
   overflow-y: auto;
+}
+
+/* ── 新建对话按钮 ── */
+.new-chat-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: rgba(37, 99, 235, 0.06);
+    border-color: var(--color-blue);
+    color: var(--color-blue);
+  }
+
+  &--icon {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0 auto 8px;
+  }
 }
 
 /* ── 导航组 ── */
@@ -378,23 +421,68 @@ async function deleteSession(id) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 8px 12px;
   border-top: 1px solid var(--border-light);
+  gap: 4px;
 
-  .collapse-btn {
-    padding: 6px;
-    border-radius: 8px;
-    color: var(--text-muted);
+  &--collapsed {
+    flex-direction: column;
+    padding: 8px;
+    gap: 4px;
+  }
+}
 
-    &:hover {
-      background: rgba(0, 0, 0, 0.04);
-    }
+.footer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 13px;
+  transition: all 0.15s;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+
+  .sidebar-footer--collapsed & {
+    justify-content: center;
+    padding: 8px;
+    width: 100%;
   }
 
-  .version {
-    font-size: 11px;
-    color: var(--text-muted);
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+    color: var(--text-primary);
   }
+
+  &.active {
+    background: rgba(0, 0, 0, 0.07);
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+}
+
+.footer-text {
+  white-space: nowrap;
+}
+
+.collapse-btn {
+  padding: 6px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.04);
+  }
+}
+
+.version {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* ── 主内容 ── */

@@ -18,6 +18,8 @@
   "dependencies": {
     "@hugeicons/core-free-icons": "^1.0.0",
     "@hugeicons/vue": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "echarts": "^6.1.0",
     "element-plus": "^2.8.0",
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.2.0",
@@ -53,13 +55,17 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "public/vite.svg"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "public/vite.svg"
     },
     "nsis": {
